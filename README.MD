@@ -305,100 +305,134 @@ python peer_client.py --username charlie --peer-port 9103 --tracker-ip 127.0.0.1
 
 #### Option B: Test via Web Interface
 
-##### Step 1: Start Services
+##### Step 1: Start All Services
 
-**Terminal 1: Tracker Server**
+**Terminal 1: Proxy Server**
+```bash
+python start_proxy.py --server-ip 0.0.0.0 --server-port 8080
+```
+
+**Terminal 2: Backend Server**
+```bash
+python start_backend.py --server-ip 127.0.0.1 --server-port 9000
+```
+
+**Terminal 3: Tracker Server**
 ```bash
 python start_chatapp.py --server-ip 0.0.0.0 --server-port 8001
 ```
 
-**Terminal 2: WebPeer Bridge Service**
+**Terminal 4: WebPeer Bridge Service**
 ```bash
 python start_webpeer.py --server-ip 0.0.0.0 --server-port 8002
 ```
 
 **Expected Output:**
 ```
-============================================================
-Starting WebPeer Bridge Service
-IP: 0.0.0.0
-Port: 8002
-============================================================
-
-This service bridges web interface to P2P communication.
-Web interface can now use P2P messaging through HTTP API.
+[Proxy] Listening on port 8080
+[Backend] Listening on port 9000
+[ChatApp] Starting Chat Tracker Server on port 8001
+[WebPeer] Starting WebPeer Bridge Service on port 8002
 ```
 
 ##### Step 2: Open Web Interface
 
-1. **Open browser:** `http://localhost:8001/chat.html` or `http://localhost:8002/chat.html`
+1. **Open browser:** `http://localhost:8080/chat.html`
 
 2. **Step 1: Session Login (Task 1)**
    - Username: `admin`
    - Password: `password`
    - Click "Login (Cookie Session)"
-   - ✅ Expected: Cookie session login successful!
+   - ✅ Expected: Cookie session login successful! Page reloads and shows Step 2.
 
 3. **Step 2: Register Peer (Task 2)**
-   - Your Username: `alice` (for P2P)
+   - Your Username (for P2P): `alice` (this is your peer identity)
    - Tracker Server IP: `127.0.0.1`
    - Tracker Server Port: `8001`
-   - Your P2P Port: `9101` (must be unique)
+   - Your P2P Port: `9100` (must be unique per peer)
    - WebPeer Service IP: `127.0.0.1`
    - WebPeer Service Port: `8002`
    - Click "Register Peer & Start Chat"
-   - ✅ Expected: Peer registered successfully!
+   - ✅ Expected: Peer registered successfully! Chat interface appears.
 
 4. **Join Channel**
-   - Select channel: `general` (or type new channel name)
+   - In the sidebar, go to "Channels" tab
+   - Type channel name: `general` (or any name)
    - Click "Join Channel"
-   - ✅ Expected: Channel joined, P2P connections established
+   - ✅ Expected: Channel joined, P2P connections established automatically
 
 5. **Send Messages**
-   - Select channel or peer from dropdown
-   - Type message in input field
+   - Select channel from sidebar (e.g., `#general`)
+   - Type message in input field at bottom
    - Click "Send" or press Enter
    - ✅ Expected: Message appears in chat window
 
-##### Step 3: Test with Multiple Users
+##### Step 3: Test with Multiple Users (2 Peers)
 
-**Browser Tab 1 - Alice:**
-- Login: `admin` / `password`
-- Register peer: `alice`, P2P port: `9101`
-- Join channel: `general`
+**Browser Window 1 - Alice:**
+1. Open: `http://localhost:8080/chat.html`
+2. Login: `admin` / `password`
+3. Register peer: 
+   - Username: `alice`
+   - P2P Port: `9100`
+   - Tracker: `127.0.0.1:8001`
+   - WebPeer: `127.0.0.1:8002`
+4. Join channel: `general`
 
-**Browser Tab 2 (or Incognito) - Bob:**
-- Login: `admin` / `password`
-- Register peer: `bob`, P2P port: `9102` (different port!)
-- Join channel: `general`
+**Browser Window 2 (Incognito) - Bob:**
+1. Open: `http://localhost:8080/chat.html` (in Incognito or different browser)
+2. Login: `admin` / `password`
+3. Register peer:
+   - Username: `bob`
+   - P2P Port: `9200` ⚠️ **Must be different from Alice!**
+   - Tracker: `127.0.0.1:8001`
+   - WebPeer: `127.0.0.1:8002`
+4. Join channel: `general`
 
 **Result:**
 - Both Alice and Bob see each other in peer list ✅
+- Click "Peers" tab → Click "Refresh Peers" → See each other
 - Messages sent in channel appear in both browsers ✅
-- Direct messages work between peers ✅
+- Direct peer-to-peer messages work ✅
 
-##### Step 4: Verify P2P Communication
+##### Step 4: Features
 
-**Check Terminal 2 (WebPeer Bridge):**
+**Channel Chat:**
+- Join multiple channels
+- Broadcast messages to all peers in a channel
+- Messages are sent via P2P (not through tracker)
+
+**Direct Peer Messaging:**
+- Click on a peer in "Peers" tab
+- Send direct messages to that peer
+- Messages go peer-to-peer directly
+
+**Peer Discovery:**
+- Click "Refresh Peers" to see all active peers
+- Automatically connects to peers in same channels
+
+##### Step 5: Verify P2P Communication
+
+**Check Terminal 4 (WebPeer Bridge):**
 ```
-[WebPeer] Init peer request received
-[WebPeer] Initialized peer for user: alice
-[Peer] Started P2P server on 127.0.0.1:9101
+[WebPeer] Init peer request received for user: alice
+[Peer] Started P2P server on 127.0.0.1:9100
 [WebPeer] Join channel request received
 [Peer] Joined channel: general
 [Peer] Connecting to peers in channel...
 [Peer] Connected to peer: bob
 ```
 
-**Check Terminal 1 (Tracker Server):**
+**Check Terminal 3 (Tracker Server):**
 ```
 [ChatApp] Submit-info request received
-[ChatApp] Peer registered: alice (127.0.0.1:9101)
+[ChatApp] Peer registered: alice (127.0.0.1:9100)
 [ChatApp] Add to channel request received
-[ChatApp] Channel general now has 1 members
+[ChatApp] Channel general now has 2 members
 [ChatApp] Get-list request received
 ```
 
 **Result:**
 - P2P TCP connections established directly between peers ✅
 - Messages go peer-to-peer, not through tracker ✅
+- Tracker only manages peer discovery and channel membership ✅

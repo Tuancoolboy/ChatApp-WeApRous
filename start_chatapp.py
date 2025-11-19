@@ -251,34 +251,45 @@ def login(headers="guest", body="anonymous"):
                 
                 # Use origin from request if available
                 # For credentials, we MUST return the exact origin from request
+                # If Origin header is missing, try to get from Referer header
+                if not origin and isinstance(headers, dict):
+                    referer = headers.get('referer') or headers.get('Referer')
+                    if referer:
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(referer)
+                            origin = f"{parsed.scheme}://{parsed.netloc}"
+                            print("[ChatApp] ✓ Extracted origin from Referer: {} -> {}".format(referer, origin))
+                        except Exception as e:
+                            print("[ChatApp] ⚠️ Failed to parse Referer: {}".format(e))
+                
                 if origin:
                     cors_origin = origin
-                    print("[ChatApp] Using origin from request: {}".format(origin))
+                    print("[ChatApp] Using origin: {}".format(origin))
                 else:
-                    # This should NOT happen - browser always sends Origin header for CORS requests
-                    # If it happens, we need to debug why origin is missing
-                    # For now, allow both common origins (development only)
-                    print("[ChatApp] ⚠️ CRITICAL: No origin found! This should not happen with CORS requests.")
-                    print("[ChatApp] ⚠️ Allowing both localhost:8001 and localhost:8002 for development")
-                    # Try to get from Referer one more time
+                    # This should NOT happen - browser always sends Origin or Referer header
+                    # For development, try to detect from Referer or use common port
+                    print("[ChatApp] ⚠️ CRITICAL: No origin found! Trying to detect from Referer...")
                     if isinstance(headers, dict):
                         referer = headers.get('referer') or headers.get('Referer')
                         if referer:
-                            try:
-                                from urllib.parse import urlparse
-                                parsed = urlparse(referer)
-                                cors_origin = f"{parsed.scheme}://{parsed.netloc}"
-                                print("[ChatApp] ✓ Using origin from Referer as last resort: {}".format(cors_origin))
-                            except:
-                                # Last resort: allow both origins (development only - NOT for production)
-                                cors_origin = "http://localhost:8002"  # Default to 8002 since that's where the issue is
-                                print("[ChatApp] ⚠️ Using fallback origin: {}".format(cors_origin))
+                            # Try to extract origin from Referer
+                            if '8080' in referer:
+                                cors_origin = "http://localhost:8080"
+                            elif '8002' in referer:
+                                cors_origin = "http://localhost:8002"
+                            elif '8001' in referer:
+                                cors_origin = "http://localhost:8001"
+                            else:
+                                # Default to 8080 (most common for proxy)
+                                cors_origin = "http://localhost:8080"
                         else:
-                            cors_origin = "http://localhost:8002"  # Default to 8002 since that's where the issue is
-                            print("[ChatApp] ⚠️ Using fallback origin: {}".format(cors_origin))
+                            # No referer either - default to 8080 (proxy port)
+                            cors_origin = "http://localhost:8080"
                     else:
-                        cors_origin = "http://localhost:8002"  # Default to 8002 since that's where the issue is
-                        print("[ChatApp] ⚠️ Using fallback origin: {}".format(cors_origin))
+                        # Default to 8080 (proxy port)
+                        cors_origin = "http://localhost:8080"
+                    print("[ChatApp] ⚠️ Using fallback origin: {} (development only)".format(cors_origin))
                 
                 headers = {
                     "Content-Type": "text/html; charset=utf-8",
